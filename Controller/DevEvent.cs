@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Entity;
 using Persistence;
+using Microsoft.EntityFrameworkCore;
 
 
 [Route("/test")]
@@ -19,17 +20,22 @@ public class DevEventsController : ControllerBase
     [HttpGet("{id}")]
     public IActionResult GetById(Guid id)
     {
-        var devEvent = _context.Events.SingleOrDefault(d => d.id == id);
+        var devEvent = _context.Events
+        .Include(de => de.Speakers)
+        .SingleOrDefault(d => d.id == id);
+
         if (devEvent == null) return NotFound();
         return Ok(devEvent);
     }
 
-    [HttpGet("{id}")]
+    [HttpPut("{id}")]
     public IActionResult Update(Guid id, DevEvent devEvent)
     {
         var eventExists = _context.Events.SingleOrDefault(d => d.id == id);
         if (eventExists == null) return NotFound();
-        _context.Events.Where(d => d.id == id).First().Update(devEvent.Title, devEvent.Description, devEvent.StartDate, devEvent.EndDate);
+        eventExists.Update(devEvent.Title, devEvent.Description, devEvent.StartDate, devEvent.EndDate);
+        _context.Events.Update(eventExists);
+        _context.SaveChanges();
         return Ok(devEvent);
     }
 
@@ -37,6 +43,7 @@ public class DevEventsController : ControllerBase
     public IActionResult Post(DevEvent devEvent)
     {
         _context.Events.Add(devEvent);
+        _context.SaveChanges();
         return CreatedAtAction(nameof(GetById), new { Id = devEvent.id }, devEvent);
     }
 
@@ -45,9 +52,24 @@ public class DevEventsController : ControllerBase
     {
         var eventExists = _context.Events.SingleOrDefault(d => d.id == id);
         if (eventExists == null) return NotFound();
-        _context.Events.Where(d => d.id == id).First().Delete();
+        eventExists.Delete();
+        _context.SaveChanges();
         return NoContent();
     }
+
+    [HttpPost("{id}/speakers")]
+    public IActionResult PostSpeaker(Guid id, DevEventSpeaker speaker)
+    {
+        var devEvent = _context.Events.Any(d => d.id == id);
+        if (!devEvent)
+        {
+            return NotFound();
+        }
+        _context.Speakers.Add(speaker);
+        _context.SaveChanges();
+        return NoContent();
+    }
+
     public DevEventsController(DevEventDbContext context)
     {
         _context = context;
